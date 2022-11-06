@@ -1,60 +1,105 @@
+from typing import Dict
+import argparse
+from math import sqrt
 import numpy as np
 from numpy import linalg as LA
 
 
-def Hamiltonian(n:int, bc:str='open'):
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description='Exact diagonalization of quantum Heisenberg chain.')
+    parser.add_argument('--S', type=float, required=True,
+                        help='Consider spin-S chain.')
+    parser.add_argument('--N', type=int, required=True,
+                        help='Number of spins.')
+
+    return parser.parse_args()
+
+def operators(S: float) -> Dict[str, np.ndarray]:
+    # operator matrix dimension is 2S+1.
+    dim = int(2*S+1)
+
+    # Kronecker delta function.
+    def delta(x, y): return 1 if x == y else 0
+
+    # Initialize dictionary of spin operators.
+    ops = {
+        'Sx': np.zeros((dim, dim), dtype=np.float64),
+        'Sy': np.zeros((dim, dim), dtype=np.complex128),
+        'Sz': np.zeros((dim, dim), dtype=np.float64),
+        'S+': np.zeros((dim, dim), dtype=np.float64),
+        'S-': np.zeros((dim, dim), dtype=np.float64),
+        'S2': np.zeros((dim, dim), dtype=np.float64),
+    }
+
+    # Calculate elements of each operator.
+    for i in range(dim):
+        for j in range(dim):
+            m1 = S - i
+            m2 = S - j
+            ops['Sx'][i, j] = (delta(m1, m2+1)+delta(m1+1, m2)
+                               )*(sqrt(S*(S+1)-m1*m2))/2
+            ops['Sy'][i, j] = -1j * \
+                (delta(m1, m2+1)-delta(m1+1, m2))*(sqrt(S*(S+1)-m1*m2))/2
+            ops['Sz'][i, j] = delta(m1, m2)*m1
+            ops['S+'][i, j] = delta(m1, m2+1)*(sqrt(S*(S+1)-m1*m2))
+            ops['S-'][i, j] = delta(m1+1, m2)*(sqrt(S*(S+1)-m1*m2))
+            ops['S2'][i, j] = delta(m1, m2)*(S*(S+1))
+
+    return ops
+
+
+def hamiltonian(S: float, N: int, bc: str = 'periodic') -> np.ndarray:
     """
     Calculate matrix representation, eignenvalues and eigenvectors of below Hamiltonian.
-
         H = Σ^n_i Hi
         Hi = (S+(i)S-(i+1) + S-(i)S+(i+1))/2 + Sz(i)Sz(i+1)
-        
+
         where
             n : number of spins.
             S(i) : spin operator on i-th site.
     """
-    # Set spin operators.
-    Sp = np.array([[0, 1], [0, 0]], dtype=np.float64)
-    Sm = np.array([[0, 0], [1, 0]], dtype=np.float64)
-    Sz = 0.5 * np.array([[1, 0], [0, -1]], dtype=np.float64)
+    dim1 = int(2*S+1)   # 1-spin state space
+    dimN = dim1**N      # N-spin state
 
-    # Set identity matrix.
-    I2 = np.identity(2, dtype=np.float64)
+    H = np.zeros((dimN, dimN), dtype=np.float64)    # Hamiltonian
+    # Identity matrix witch operates single spin.
+    I = np.identity(dim1, dtype=np.float64)
 
-    # Calculate matrix representation of Hamiltonian.
-    H = np.zeros((2**n, 2**n), dtype=np.float64)
+    ops = operators(S)  # spin operators.
 
-    ## Bulk part.
-    for i in range(n-1):
-        Hi = 0.5 * (np.kron(Sp, Sm) + np.kron(Sm, Sp)) + np.kron(Sz, Sz)
+    # Calculate Hamiltonian elements (bulk part).
+    for i in range(N-1):
+        Hi = 0.5 * (np.kron(ops['S+'], ops['S-']) + np.kron(ops['S-'],
+                    ops['S+'])) + np.kron(ops['Sz'], ops['Sz'])
         for _ in range(0, i):
-            Hi = np.kron(I2, Hi)
-        for _ in range(i+2, n):
-            Hi = np.kron(Hi, I2)
+            Hi = np.kron(I, Hi)
+        for _ in range(i+2, N):
+            Hi = np.kron(Hi, I)
         H += Hi
 
-    ## Boundary part
-    # NOTE Plese comment out follow lines if you want open boudary.
+    # Calculate Hamiltonian elements (boundary part).
     if bc == 'periodic':
-        In2 = np.identity(2**(n-2), dtype=np.float64)
-        Hi = 0.5 * (np.kron(Sp, np.kron(In2, Sm)) + np.kron(Sm, np.kron(In2, Sp))) + np.kron(Sz, np.kron(In2, Sz))
+        # Identity matrix which operates bulk spins.
+        I = np.identity(dim1**(N-2), dtype=np.float64)
+        Hi = 0.5 * (np.kron(ops['S+'], np.kron(I, ops['S-'])) + np.kron(
+            ops['S-'], np.kron(I, ops['S+']))) + np.kron(ops['Sz'], np.kron(I, ops['Sz']))
         H += Hi
 
-    # Calculate eigenvalues and eigenvectors.
-    w, v = LA.eigh(H)
-
-    # Set return object.
-    ret = {
-        'Hamiltonian': H,
-        'Eigenvalues': w,
-        'Eigenvectors': v
-    }
-
-    return ret
+    return H
 
 
 if __name__ == '__main__':
-    ret = Hamiltonian(12)
-    print(ret['Hamiltonian'])
-    print(ret['Eigenvalues'])
-    print(ret['Eigenvectors'])
+    # Get arguments.
+    args = parse_args()
+
+    # Get matrix representation.
+    H = hamiltonian(args.S, args.N)
+
+    # Diagonalize.
+    w, v = LA.eigh(H)
+
+    # print eigenenergy and eigenstate.
+    for i in range(4):
+        print(f'E{i} = {w[i]}')
+        print(f'|ψ{i}> = {v[:,i]}')
