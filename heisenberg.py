@@ -7,7 +7,7 @@ from numpy import linalg as LA
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description='Exact diagonalization of quantum Heisenberg chain.')
+        description='Exact diagonalization of arbitrary-S quantum Heisenberg chain.')
     parser.add_argument('--S', type=float, required=True,
                         help='Consider spin-S chain.')
     parser.add_argument('--N', type=int, required=True,
