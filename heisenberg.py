@@ -59,12 +59,11 @@ def hamiltonian(S: float, N: int, bc: str = 'periodic') -> np.ndarray:
             n : number of spins.
             S(i) : spin operator on i-th site.
     """
-    dim1 = int(2*S+1)   # 1-spin state space
-    dimN = dim1**N      # N-spin state
+    dim1 = int(2*S+1)   # 1-spin state space dimension.
+    dimN = dim1**N      # N-spin state space dimension.
 
     H = np.zeros((dimN, dimN), dtype=np.float64)    # Hamiltonian
-    # Identity matrix witch operates single spin.
-    I = np.identity(dim1, dtype=np.float64)
+    I = np.identity(dim1, dtype=np.float64)         # Identity matrix witch operates single spin.
 
     ops = operators(S)  # spin operators.
 
@@ -80,8 +79,7 @@ def hamiltonian(S: float, N: int, bc: str = 'periodic') -> np.ndarray:
 
     # Calculate Hamiltonian elements (boundary part).
     if bc == 'periodic':
-        # Identity matrix which operates bulk spins.
-        I = np.identity(dim1**(N-2), dtype=np.float64)
+        I = np.identity(dim1**(N-2), dtype=np.float64)  # Identity matrix which operates bulk spins.
         Hi = 0.5 * (np.kron(ops['S+'], np.kron(I, ops['S-'])) + np.kron(
             ops['S-'], np.kron(I, ops['S+']))) + np.kron(ops['Sz'], np.kron(I, ops['Sz']))
         H += Hi
